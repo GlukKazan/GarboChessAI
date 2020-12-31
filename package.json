@@ -1,0 +1,16 @@
+{
+  "name": "garbochess-ai",
+  "version": "1.0.0",
+  "description": "Garbo Chess AI for DagazServer",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Valentin Chelnokov",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "underscore": "^1.12.0"
+  }
+}
