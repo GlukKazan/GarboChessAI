@@ -235,7 +235,10 @@ function Search(finishMoveCallback, maxPly, finishPlyCallback) {
     }
 
     if (finishMoveCallback != null) {
-        finishMoveCallback(bestMove, value, (new Date()).getTime() - g_startTime, i - 1);
+        MakeMove(bestMove);
+        var curFen = GetFen();
+        UnmakeMove(bestMove);
+        finishMoveCallback(bestMove, curFen, value, (new Date()).getTime() - g_startTime, i - 1);
     }
 }
 
