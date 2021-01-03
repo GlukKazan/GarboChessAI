@@ -34,7 +34,7 @@ let turn   = null;
 let debuts = [];
 
 function App() {
-    this.state  = STATE.INIT; // STATE.STRT;
+    this.state  = STATE.STRT;
     this.states = [];
 }
 
@@ -207,6 +207,63 @@ let checkPrefix = function(fen) {
     return null;
 }
 
+let getFen = function(fen, move) {
+    let board = [];
+    let w = null;
+    for (let i = 0; i < fen.length; i++) {
+        let c = fen[i];
+        if (c == ' ') break;
+        if ((c >= '0') && (c <= 9)) {
+            for (let k = 0; k < c; k++) {
+                board.push('-');
+            }
+        } else if (c == '/') {
+            if (w === null) {
+                w = board.length;
+            }
+        } else {
+            board.push(c);
+        }
+    }
+    if (w === null) return null;
+    let h = (board.length / w) | 0;
+    const r = move.match(/(\w)(\d)-(\w)(\d)/);
+    if (!r) return null;
+    const f = (h - r[2]) * w + (r[1].charCodeAt(0) - 'a'.charCodeAt(0));
+    const t = (h - r[4]) * w + (r[3].charCodeAt(0) - 'a'.charCodeAt(0));
+    if ((f >= board.length) || (t >= board.length)) return null;
+    board[t] = board[f];
+    board[f] = '-';
+    let res = ''; let c = 0;
+    for (let i = 0; i < board.length; i++) {
+        if ((i > 0) && (i % w == 0)) {
+            if (c > 0) {
+                res += c;
+                c = 0;
+            }
+            res += '/';
+        }
+        if (board[i] == '-') {
+            c++;
+        } else {
+            if (c > 0) {
+                res += c;
+                c = 0;
+            }
+            res += board[i];
+        }
+    }
+    if (c > 0) {
+        res += c;
+    }
+    if (turn == 0) {
+        res += ' b kqKQ - 0 1';
+    } else {
+        res += ' w kqKQ - 0 1';
+    }
+    return res;
+}
+
 let sendMove = function(app) {
 //  console.log('MOVE');
 //  console.log('sid = ' + sid);
@@ -225,9 +282,30 @@ let sendMove = function(app) {
             const ix = _.random(0, m.length - 1);
             const move = m[ix];
             console.log('move = ' + move);
-            app.state  = STATE.STOP;
-            // TODO: addMove after FEN-generating
-    
+            const f = getFen(fen, move);
+//          console.log('fen = ' + f);
+            if (f === null) {
+                app.state  = STATE.STOP;
+            } else {
+                let s = getSetup(f);
+//              console.log('s = ' + s);
+                app.state  = STATE.WAIT;
+                axios.post(SERVICE + '/api/move', {
+                    uid: uid,
+                    next_player: (turn == 0) ? 2 : 1,
+                    move_str: move,
+                    setup_str: s
+                }, {
+                    headers: { Authorization: `Bearer ${TOKEN}` }
+                })
+                .then(function (response) {
+                    app.state  = STATE.TURN;
+                })
+                .catch(function (error) {
+                    console.log('MOVE ERROR: ' + error);
+                    app.state  = STATE.STOP;
+                });
+            }
         } else {
             garbo.FindMove(fen, _.random(MIN_AI_TIMEOUT, MAX_AI_TIMEOUT), FinishTurnCallback);
         }
