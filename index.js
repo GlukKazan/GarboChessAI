@@ -208,6 +208,7 @@ let checkPrefix = function(fen) {
 }
 
 let getFen = function(fen, move) {
+    const m = move.split('/');
     let board = [];
     let w = null;
     for (let i = 0; i < fen.length; i++) {
@@ -227,7 +228,7 @@ let getFen = function(fen, move) {
     }
     if (w === null) return null;
     let h = (board.length / w) | 0;
-    const r = move.match(/(\w)(\d)-(\w)(\d)/);
+    const r = m[0].match(/(\w)(\d)-(\w)(\d)/);
     if (!r) return null;
     const f = (h - r[2]) * w + (r[1].charCodeAt(0) - 'a'.charCodeAt(0));
     const t = (h - r[4]) * w + (r[3].charCodeAt(0) - 'a'.charCodeAt(0));
@@ -257,10 +258,16 @@ let getFen = function(fen, move) {
         res += c;
     }
     if (turn == 0) {
-        res += ' b kqKQ - 0 1';
+        res += ' b ';
     } else {
-        res += ' w kqKQ - 0 1';
+        res += ' w ';
     }
+    if (m.length > 1) {
+        res += m[1];
+    } else {
+        res += 'KQkq';
+    }
+    res += ' - 0 1';
     return res;
 }
 
@@ -279,7 +286,10 @@ let sendMove = function(app) {
         if (moves) {
             const m = moves.split(',');
             console.log(m);
-            const ix = _.random(0, m.length - 1);
+            let ix = 0;
+            if (m.length > 1) {
+                ix = _.random(0, m.length - 1);
+            }
             const move = m[ix];
             console.log('move = ' + move);
             const f = getFen(fen, move);
