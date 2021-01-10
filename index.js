@@ -364,7 +364,7 @@ let addSess = function(app) {
         selector_value: 1,
         player_num: 2,
         filename: "chess",
-        ai: 1
+        ai: 0
     }, {
         headers: { Authorization: `Bearer ${TOKEN}` }
     })
