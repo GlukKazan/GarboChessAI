@@ -43,9 +43,9 @@ let app = new App();
 let loadDebuts = function(app) {
     console.log('STRT');
     app.state = STATE.WAIT;
-    axios.get(SERVICE + '/api/game/debut/31')
+    axios.get(SERVICE + '/api/game/openings/31')
     .then(function (response) {
-        console.log(response.data);
+//      console.log(response.data);
         _.each(response.data, (x) => {
             debuts.push(x);
         });
@@ -86,7 +86,7 @@ let recovery = function(app) {
         headers: { Authorization: `Bearer ${TOKEN}` }
     })
     .then(function (response) {
-        console.log(response.data);
+//      console.log(response.data);
         uid = response.data.uid;
         app.state = STATE.GETM;
       })
@@ -104,7 +104,7 @@ let getConfirmed = function(app) {
         headers: { Authorization: `Bearer ${TOKEN}` }
     })
     .then(function (response) {
-        console.log(response.data);
+//      console.log(response.data);
         app.state = STATE.MOVE;
     })
     .catch(function (error) {
@@ -122,7 +122,7 @@ let checkTurn = function(app) {
     })
     .then(function (response) {
         if (response.data.length > 0) {
-            console.log(response.data);
+//          console.log(response.data);
             sid = response.data[0].id;
             setup = response.data[0].last_setup;
             if (!setup) {
@@ -154,6 +154,10 @@ function FinishTurnCallback(bestMove, fen) {
     if (bestMove != null) {
         garbo.MakeMove(bestMove);
         let move = garbo.FormatMove(bestMove);
+        const result = setup.match(/[?&]turn=(\d+)/);
+        if (result) {
+            turn = result[1];
+        }
         if (move.startsWith('O-O')) {
             if (turn == 0) {
                 if (move == 'O-O-O') {
@@ -172,11 +176,7 @@ function FinishTurnCallback(bestMove, fen) {
            const re = /\s(\w)/;
            const r = move.match(re);
            if (r) {
-               const result = setup.match(/[?&]turn=(\d+)/);
-               if (result) {
-                   turn = result[1];
-                   move = move.replace(re, ((turn == 0) ? ' White ' : ' Black ') + r[1]);
-               }
+               move = move.replace(re, ((turn == 0) ? ' White ' : ' Black ') + r[1]);
             }
         }
         console.log('move = ' + move);
@@ -297,6 +297,10 @@ let sendMove = function(app) {
             if (f === null) {
                 app.state  = STATE.STOP;
             } else {
+                const r = setup.match(/[?&]turn=(\d+)/);
+                if (r) {
+                    turn = r[1];
+                }
                 let s = getSetup(f);
 //              console.log('s = ' + s);
                 app.state  = STATE.WAIT;
