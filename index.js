@@ -17,14 +17,14 @@ const STATE = {
     GETM: 9
 };
 
-const SERVICE  = 'http://127.0.0.1:3000'; // 'http://games.dtco.ru';
+const SERVICE  = 'http://games.dtco.ru';
 const USERNAME = 'garbo';
 const PASSWORD = 'garbo';
 
 const MAX_SESSIONS   = 3;
-const MIN_SESSIONS   = 1; // 1;
-const MIN_AI_TIMEOUT = 500; // 5000;
-const MAX_AI_TIMEOUT = 1000; // 10000;
+const MIN_SESSIONS   = 1;
+const MIN_AI_TIMEOUT = 3000;
+const MAX_AI_TIMEOUT = 5000;
 
 let TOKEN  = null;
 let sid    = null;
@@ -32,6 +32,34 @@ let uid    = null;
 let setup  = null;
 let turn   = null;
 let debuts = [];
+
+var winston = require('winston');
+require('winston-daily-rotate-file');
+
+const logFormat = winston.format.combine(
+    winston.format.timestamp({
+        format: 'HH:mm:ss'
+    }),
+    winston.format.printf(
+        info => `${info.level}: ${info.timestamp} - ${info.message}`
+    )
+);
+
+var transport = new winston.transports.DailyRotateFile({
+    dirname: '',
+    filename: 'garbochess-%DATE%.log',
+    datePattern: 'YYYY-MM-DD',
+    zippedArchive: true,
+    maxSize: '20m',
+    maxFiles: '14d'
+});
+
+var logger = winston.createLogger({
+    format: logFormat,
+    transports: [
+      transport
+    ]
+});
 
 function App() {
     this.state  = STATE.STRT;
@@ -42,6 +70,7 @@ let app = new App();
 
 let loadDebuts = function(app) {
     console.log('STRT');
+    logger.info('STRT');
     app.state = STATE.WAIT;
     axios.get(SERVICE + '/api/game/openings/31')
     .then(function (response) {
@@ -52,7 +81,8 @@ let loadDebuts = function(app) {
         app.state = STATE.INIT;
       })
       .catch(function (error) {
-        console.log('INIT ERROR: ' + error);
+        console.log('STRT ERROR: ' + error);
+        logger.error('STRT ERROR: ' + error);
         app.state  = STATE.STOP;
       });
   
@@ -61,6 +91,7 @@ let loadDebuts = function(app) {
 
 let init = function(app) {
     console.log('INIT');
+    logger.info('INIT');
     app.state = STATE.WAIT;
     axios.post(SERVICE + '/api/auth/login', {
         username: USERNAME,
@@ -72,6 +103,7 @@ let init = function(app) {
     })
     .catch(function (error) {
       console.log('INIT ERROR: ' + error);
+      logger.error('INIT ERROR: ' + error);
       app.state  = STATE.STOP;
     });
     return true;
@@ -92,6 +124,7 @@ let recovery = function(app) {
       })
       .catch(function (error) {
         console.log('RECO ERROR: ' + error);
+        logger.error('RECO ERROR: ' + error);
         app.state  = STATE.STOP;
       });
       return true;
@@ -109,6 +142,7 @@ let getConfirmed = function(app) {
     })
     .catch(function (error) {
         console.log('GETM ERROR: ' + error);
+        logger.error('GETM ERROR: ' + error);
         app.state  = STATE.STOP;
     });
     return true;
@@ -135,6 +169,7 @@ let checkTurn = function(app) {
       })
       .catch(function (error) {
         console.log('TURN ERROR: ' + error);
+        logger.error('TURN ERROR: ' + error);
         app.state  = STATE.STOP;
       });
       return true;
@@ -180,6 +215,7 @@ function FinishTurnCallback(bestMove, fen) {
             }
         }
         console.log('move = ' + move);
+        logger.info('move = ' + move);
         app.state  = STATE.WAIT;
         axios.post(SERVICE + '/api/move', {
             uid: uid,
@@ -194,6 +230,7 @@ function FinishTurnCallback(bestMove, fen) {
           })
           .catch(function (error) {
             console.log('MOVE ERROR: ' + error);
+            logger.error('MOVE ERROR: ' + error);
             app.state  = STATE.STOP;
          });
     }
@@ -281,17 +318,20 @@ let sendMove = function(app) {
         let fen = result[1];
 //      const re = /\s[-k][-q][-K][-Q]\s/;
 //      fen = fen.replace(re, ' ---- '); // TODO: Implement Castling
-        console.log('fen = ' + fen);
+        console.log('[' + sid + '] fen = ' + fen);
+        logger.info('[' + sid + '] fen = ' + fen);
         let moves = checkPrefix(fen);
         if (moves) {
             const m = moves.split(',');
             console.log(m);
+            logger.info(m);
             let ix = 0;
             if (m.length > 1) {
                 ix = _.random(0, m.length - 1);
             }
             const move = m[ix];
             console.log('move = ' + move);
+            logger.info('move = ' + move);
             const f = getFen(fen, move);
 //          console.log('fen = ' + f);
             if (f === null) {
@@ -317,6 +357,7 @@ let sendMove = function(app) {
                 })
                 .catch(function (error) {
                     console.log('MOVE ERROR: ' + error);
+                    logger.error('MOVE ERROR: ' + error);
                     app.state  = STATE.STOP;
                 });
             }
@@ -354,6 +395,7 @@ let checkSess = function(app) {
       })
       .catch(function (error) {
         console.log('CHCK ERROR: ' + error);
+        logger.error('CHCK ERROR: ' + error);
         app.state  = STATE.STOP;
       });
     return true;
@@ -374,10 +416,12 @@ let addSess = function(app) {
     })
     .then(function (response) {
         console.log(response.data);
+        logger.info(response.data);
         app.state = STATE.TURN;
       })
       .catch(function (error) {
         console.log('SESS ERROR: ' + error);
+        logger.error('SESS ERROR: ' + error);
         app.state  = STATE.STOP;
       });
     return true;
@@ -390,6 +434,7 @@ let wait = function(app) {
 
 let stop = function(app) {
     console.log('STOP');
+    logger.info('STOP');
     return false;
 }
 
