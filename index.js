@@ -32,6 +32,7 @@ let uid    = null;
 let setup  = null;
 let turn   = null;
 let debuts = [];
+let mines  = null;
 
 var winston = require('winston');
 require('winston-daily-rotate-file');
@@ -125,7 +126,7 @@ let recovery = function(app) {
       .catch(function (error) {
         console.log('RECO ERROR: ' + error);
         logger.error('RECO ERROR: ' + error);
-        app.state  = STATE.STOP;
+        app.state  = STATE.INIT;
       });
       return true;
 }
@@ -143,7 +144,7 @@ let getConfirmed = function(app) {
     .catch(function (error) {
         console.log('GETM ERROR: ' + error);
         logger.error('GETM ERROR: ' + error);
-        app.state  = STATE.STOP;
+        app.state  = STATE.INIT;
     });
     return true;
 }
@@ -170,7 +171,7 @@ let checkTurn = function(app) {
       .catch(function (error) {
         console.log('TURN ERROR: ' + error);
         logger.error('TURN ERROR: ' + error);
-        app.state  = STATE.STOP;
+        app.state  = STATE.INIT;
       });
       return true;
 }
@@ -185,67 +186,7 @@ function getSetup(fen) {
     return r;
 }
 
-function FinishTurnCallback(bestMove, fen) {
-    if (bestMove != null) {
-        garbo.MakeMove(bestMove);
-        let move = garbo.FormatMove(bestMove);
-        const result = setup.match(/[?&]turn=(\d+)/);
-        if (result) {
-            turn = result[1];
-        }
-        if (move.startsWith('O-O')) {
-            if (turn == 0) {
-                if (move == 'O-O-O') {
-                    move = 'e1-a1 White King a1-d1 White Rook';
-                } else {
-                    move = 'e1-g1 White King h1-f1 White Rook';
-                }
-            } else {
-                if (move == 'O-O-O') {
-                    move = 'e8-a8 Black King a8-d8 Black Rook';
-                } else {
-                    move = 'e8-g8 Black King h8-f8 Black Rook';
-                }
-            }
-        } else {
-           const re = /\s(\w)/;
-           const r = move.match(re);
-           if (r) {
-               move = move.replace(re, ((turn == 0) ? ' White ' : ' Black ') + r[1]);
-            }
-        }
-        console.log('move = ' + move);
-        logger.info('move = ' + move);
-        app.state  = STATE.WAIT;
-        axios.post(SERVICE + '/api/move', {
-            uid: uid,
-            next_player: (turn == 0) ? 2 : 1,
-            move_str: move,
-            setup_str: getSetup(fen)
-        }, {
-            headers: { Authorization: `Bearer ${TOKEN}` }
-        })
-        .then(function (response) {
-            app.state  = STATE.TURN;
-          })
-          .catch(function (error) {
-            console.log('MOVE ERROR: ' + error);
-            logger.error('MOVE ERROR: ' + error);
-            app.state  = STATE.STOP;
-         });
-    }
-    app.state  = STATE.STOP;
-}
-
-let checkPrefix = function(fen) {
-    for (let i = 0; i < debuts.length; i++) {
-        if (fen.startsWith(debuts[i].setup_prefix)) return debuts[i].move_list;
-    }
-    return null;
-}
-
-let getFen = function(fen, move) {
-    const m = move.split('/');
+let decodeFen = function(fen) {
     let board = [];
     let w = null;
     for (let i = 0; i < fen.length; i++) {
@@ -263,15 +204,13 @@ let getFen = function(fen, move) {
             board.push(c);
         }
     }
-    if (w === null) return null;
-    let h = (board.length / w) | 0;
-    const r = m[0].match(/(\w)(\d)-(\w)(\d)/);
-    if (!r) return null;
-    const f = (h - r[2]) * w + (r[1].charCodeAt(0) - 'a'.charCodeAt(0));
-    const t = (h - r[4]) * w + (r[3].charCodeAt(0) - 'a'.charCodeAt(0));
-    if ((f >= board.length) || (t >= board.length)) return null;
-    board[t] = board[f];
-    board[f] = '-';
+    return {
+        board: board,
+        width: w
+    };
+}
+
+let encodeFen = function(board, m, w) {
     let res = ''; let c = 0;
     for (let i = 0; i < board.length; i++) {
         if ((i > 0) && (i % w == 0)) {
@@ -308,16 +247,123 @@ let getFen = function(fen, move) {
     return res;
 }
 
+let takeMines = function(board) {
+    let res = []; let f = true;
+    for (let i = 0; i < board.length; i++) {
+        if (board[i] == 'm') {
+            board[i] = '-';
+            res.push('m');
+            f = false;
+        } else {
+            res.push('-');
+        }
+    }
+    if (f) return null;
+    return res;
+}
+
+let putMines = function(board, m) {
+    if (m === null) return;
+    for (let i = 0; i < board.length; i++) {
+        if (i >= m.length) break;
+        if (board[i] == '-') {
+            board[i] = m[i];
+        }
+    }
+}
+
+function FinishTurnCallback(bestMove, fen, value, time, ply) {
+    if (bestMove != null) {
+        garbo.MakeMove(bestMove);
+        let move = garbo.FormatMove(bestMove);
+        const result = setup.match(/[?&]turn=(\d+)/);
+        if (result) {
+            turn = result[1];
+        }
+        if (move.startsWith('O-O')) {
+            if (turn == 0) {
+                if (move == 'O-O-O') {
+                    move = 'e1-a1 White King a1-d1 White Rook';
+                } else {
+                    move = 'e1-g1 White King h1-f1 White Rook';
+                }
+            } else {
+                if (move == 'O-O-O') {
+                    move = 'e8-a8 Black King a8-d8 Black Rook';
+                } else {
+                    move = 'e8-g8 Black King h8-f8 Black Rook';
+                }
+            }
+        } else {
+           const re = /\s(\w)/;
+           const r = move.match(re);
+           if (r) {
+               move = move.replace(re, ((turn == 0) ? ' White ' : ' Black ') + r[1]);
+            }
+        }
+        console.log('move = ' + move);
+        logger.info('move = ' + move);
+        app.state  = STATE.WAIT;
+        if (mines !== null) {
+            const d = decodeFen(fen);
+            let board = d.board;
+            putMines(board, mines);
+            fen = encodeFen(board, [], d.width);
+            mines = null;
+        }
+        axios.post(SERVICE + '/api/move', {
+            uid: uid,
+            next_player: (turn == 0) ? 2 : 1,
+            move_str: move,
+            setup_str: getSetup(fen),
+            note: 'time=' + time + ', value=' + value + ', ply=' + ply
+        }, {
+            headers: { Authorization: `Bearer ${TOKEN}` }
+        })
+        .then(function (response) {
+            app.state  = STATE.TURN;
+        })
+        .catch(function (error) {
+            console.log('MOVE ERROR: ' + error);
+            logger.error('MOVE ERROR: ' + error);
+            app.state  = STATE.INIT;
+        });
+    }
+    app.state  = STATE.STOP;
+}
+
+let checkPrefix = function(fen) {
+    for (let i = 0; i < debuts.length; i++) {
+        if (fen.startsWith(debuts[i].setup_prefix)) return debuts[i].move_list;
+    }
+    return null;
+}
+
+let getFen = function(fen, move) {
+    const d = decodeFen(fen);
+    let board = d.board;
+    const m = takeMines(board);
+    const w = d.width;
+    const moves = move.split('/');
+    if (w === null) return null;
+    const h = (board.length / w) | 0;
+    const r = moves[0].match(/(\w)(\d)-(\w)(\d)/);
+    if (!r) return null;
+    const f = (h - r[2]) * w + (r[1].charCodeAt(0) - 'a'.charCodeAt(0));
+    const t = (h - r[4]) * w + (r[3].charCodeAt(0) - 'a'.charCodeAt(0));
+    if ((f >= board.length) || (t >= board.length)) return null;
+    board[t] = board[f];
+    board[f] = '-';
+    putMines(board, m);
+    return encodeFen(board, moves, d.width);
+}
+
 let sendMove = function(app) {
 //  console.log('MOVE');
-//  console.log('sid = ' + sid);
-//  console.log('setup = ' + setup);
     app.state  = STATE.WAIT;
     const result = setup.match(/[?&]setup=(.*)/);
     if (result) {
         let fen = result[1];
-//      const re = /\s[-k][-q][-K][-Q]\s/;
-//      fen = fen.replace(re, ' ---- '); // TODO: Implement Castling
         console.log('[' + sid + '] fen = ' + fen);
         logger.info('[' + sid + '] fen = ' + fen);
         let moves = checkPrefix(fen);
@@ -358,10 +404,12 @@ let sendMove = function(app) {
                 .catch(function (error) {
                     console.log('MOVE ERROR: ' + error);
                     logger.error('MOVE ERROR: ' + error);
-                    app.state  = STATE.STOP;
+                    app.state  = STATE.INIT;
                 });
             }
         } else {
+            const re = /m/g;
+            fen = fen.replace(re, '1');
             garbo.FindMove(fen, _.random(MIN_AI_TIMEOUT, MAX_AI_TIMEOUT), FinishTurnCallback);
         }
     } else {
@@ -396,7 +444,7 @@ let checkSess = function(app) {
       .catch(function (error) {
         console.log('CHCK ERROR: ' + error);
         logger.error('CHCK ERROR: ' + error);
-        app.state  = STATE.STOP;
+        app.state  = STATE.INIT;
       });
     return true;
 }
@@ -422,7 +470,7 @@ let addSess = function(app) {
       .catch(function (error) {
         console.log('SESS ERROR: ' + error);
         logger.error('SESS ERROR: ' + error);
-        app.state  = STATE.STOP;
+        app.state  = STATE.INIT;
       });
     return true;
 }
