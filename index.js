@@ -23,16 +23,17 @@ const PASSWORD = 'garbo';
 
 const MAX_SESSIONS   = 3;
 const MIN_SESSIONS   = 1;
-const MIN_AI_TIMEOUT = 3000;
-const MAX_AI_TIMEOUT = 5000;
+const MIN_AI_TIMEOUT = 1000;
+const MAX_AI_TIMEOUT = 2000;
 
-let TOKEN  = null;
-let sid    = null;
-let uid    = null;
-let setup  = null;
-let turn   = null;
-let debuts = [];
-let mines  = null;
+let TOKEN   = null;
+let sid     = null;
+let uid     = null;
+let setup   = null;
+let turn    = null;
+let debuts  = [];
+let mines   = null;
+let timeout = null;
 
 var winston = require('winston');
 require('winston-daily-rotate-file');
@@ -114,13 +115,15 @@ let recovery = function(app) {
 //  console.log('RECO');
     app.state = STATE.WAIT;
     axios.post(SERVICE + '/api/session/recovery', {
-        id: sid
+        id: sid,
+        setup_required: true
     }, {
         headers: { Authorization: `Bearer ${TOKEN}` }
     })
     .then(function (response) {
 //      console.log(response.data);
         uid = response.data.uid;
+        timeout = response.data.ai_timeout;
         app.state = STATE.GETM;
       })
       .catch(function (error) {
@@ -301,8 +304,8 @@ function FinishTurnCallback(bestMove, fen, value, time, ply) {
                move = move.replace(re, ((turn == 0) ? ' White ' : ' Black ') + r[1]);
             }
         }
-        console.log('move = ' + move);
-        logger.info('move = ' + move);
+        console.log('move = ' + move + ', time=' + time + ', value=' + value + ', ply=' + ply);
+        logger.info('move = ' + move + ', time=' + time + ', value=' + value + ', ply=' + ply);
         app.state  = STATE.WAIT;
         if (mines !== null) {
             const d = decodeFen(fen);
@@ -410,7 +413,7 @@ let sendMove = function(app) {
         } else {
             const re = /m/g;
             fen = fen.replace(re, '1');
-            garbo.FindMove(fen, _.random(MIN_AI_TIMEOUT, MAX_AI_TIMEOUT), FinishTurnCallback);
+            garbo.FindMove(fen, _.random(MIN_AI_TIMEOUT + (timeout ? timeout : 0), MAX_AI_TIMEOUT + (timeout ? timeout : 0)), FinishTurnCallback);
         }
     } else {
         app.state  = STATE.STOP;
