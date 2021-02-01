@@ -14,14 +14,16 @@
 
 var g_debug = true;
 var g_timeout = 40;
+var g_width = 8;
+var g_height = 8;
 
 function GetFen(){
     var result = "";
-    for (var row = 0; row < 8; row++) {
+    for (var row = 0; row < g_height; row++) {
         if (row != 0) 
             result += '/';
         var empty = 0;
-        for (var col = 0; col < 8; col++) {
+        for (var col = 0; col < g_width; col++) {
             var piece = g_board[((row + 2) << 4) + col + 4];
             if (piece == 0) {
                 empty++;
@@ -134,7 +136,7 @@ function GetMoveSAN(move, validMoves) {
 
 function FormatSquare(square) {
     var letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-    return letters[(square & 0xF) - 4] + ((9 - (square >> 4)) + 1);
+    return letters[(square & 0xF) - 4] + (((g_height + 1) - (square >> 4)) + 1);
 }
 
 function FormatMove(move) {
@@ -1176,6 +1178,8 @@ var moveflagPromoteKnight = 0x20 << 16;
 var moveflagPromoteQueen = 0x40 << 16;
 var moveflagPromoteBishop = 0x80 << 16;
 
+var g_flags = moveflagPromoteKnight | moveflagPromoteQueen | moveflagPromoteBishop | moveflagCastleKing | moveflagCastleQueen | moveflagEPC;
+
 function MT() {
  	var N = 624;
 	var M = 397;
@@ -2103,8 +2107,8 @@ function GenerateAllMoves(moveStack) {
 		to = from - 17; if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
 		to = from + 15; if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
 		to = from + 17; if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
-		to = from - 1; if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
-		to = from + 1; if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
+		to = from - 1;  if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
+		to = from + 1;  if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
 		to = from - 16; if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
 		to = from + 16; if (g_board[to] == 0) moveStack[moveStack.length] = GenerateMove(from, to);
 		
@@ -2112,13 +2116,13 @@ function GenerateAllMoves(moveStack) {
             var castleRights = g_castleRights;
             if (!g_toMove) 
                 castleRights >>= 2;
-            if (castleRights & 1) {
+            if ((castleRights & 1) && (g_flags & moveflagCastleKing)) {
                 // Kingside castle
                 if (g_board[from + 1] == pieceEmpty && g_board[from + 2] == pieceEmpty) {
                     moveStack[moveStack.length] = GenerateMove(from, from + 0x02, moveflagCastleKing);
                 }
             }
-            if (castleRights & 2) {
+            if ((castleRights & 2) && (g_flags & moveflagCastleQueen)) {
                 // Queenside castle
                 if (g_board[from - 1] == pieceEmpty && g_board[from - 2] == pieceEmpty && g_board[from - 3] == pieceEmpty) {
                     moveStack[moveStack.length] = GenerateMove(from, from - 0x02, moveflagCastleQueen);
@@ -2235,9 +2239,15 @@ function GenerateCaptureMoves(moveStack, moveScores) {
 function MovePawnTo(moveStack, start, square) {
 	var row = square & 0xF0;
     if ((row == 0x90) || (row == 0x20)) {
-        moveStack[moveStack.length] = GenerateMove(start, square, moveflagPromotion | moveflagPromoteQueen);
-        moveStack[moveStack.length] = GenerateMove(start, square, moveflagPromotion | moveflagPromoteKnight);
-        moveStack[moveStack.length] = GenerateMove(start, square, moveflagPromotion | moveflagPromoteBishop);
+        if (g_flags & moveflagPromoteQueen) {
+            moveStack[moveStack.length] = GenerateMove(start, square, moveflagPromotion | moveflagPromoteQueen);
+        }
+        if (g_flags & moveflagPromoteKnight) {
+            moveStack[moveStack.length] = GenerateMove(start, square, moveflagPromotion | moveflagPromoteKnight);
+        }
+        if (g_flags & moveflagPromoteBishop) {
+            moveStack[moveStack.length] = GenerateMove(start, square, moveflagPromotion | moveflagPromoteBishop);
+        }
         moveStack[moveStack.length] = GenerateMove(start, square, moveflagPromotion);
     }
     else {
@@ -2259,7 +2269,7 @@ function GeneratePawnMoves(moveStack, from) {
 		if ((((from & 0xF0) == 0x30) && color != colorWhite) ||
 		    (((from & 0xF0) == 0x80) && color == colorWhite)) {
 			to += inc;
-			if (g_board[to] == 0) {
+			if ((g_board[to] == 0) && (g_flags & moveflagEPC)) {
 				moveStack[moveStack.length] = GenerateMove(from, to);
 			}				
 		}
@@ -2517,10 +2527,17 @@ var needsReset = true;
     }
 }*/
 
-function FindMove(fen, timeout, callback) {
+function debugPlyCallback(bestMove, value, time, ply) {
+    console.log(FormatMove(bestMove) + ', v = ' + value + ', t = ' + time + ', ply = ' + ply);
+}
+
+function FindMove(fen, timeout, callback, flags, width, height) {
     ResetGame();
     InitializeFromFen(fen);
     g_timeout = timeout;
+    g_flags   = flags;
+    g_width   = width;
+    g_height  = height;
     Search(callback, 99, null);
 }
 

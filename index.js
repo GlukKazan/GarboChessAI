@@ -35,6 +35,11 @@ let debuts  = [];
 let mines   = null;
 let timeout = null;
 
+let variant  = 31;
+let ai_flags = 0x20 | 0x40 | 0x80 | 0x2 | 0x4 | 0x8;
+let width    = 8;
+let height   = 8;
+
 var winston = require('winston');
 require('winston-daily-rotate-file');
 
@@ -121,9 +126,22 @@ let recovery = function(app) {
         headers: { Authorization: `Bearer ${TOKEN}` }
     })
     .then(function (response) {
-//      console.log(response.data);
+        console.log(response.data);
         uid = response.data.uid;
         timeout = response.data.ai_timeout;
+        variant = response.data.variant_id;
+        ai_flags = response.data.ai_flags;
+        if (!ai_flags) {
+            ai_flags = 0x20 | 0x40 | 0x80 | 0x2 | 0x4 | 0x8;
+        }
+        width = response.data.width;
+        if (!width) {
+            width = 8;
+        }
+        height = response.data.height;
+        if (!height) {
+            height = 8;
+        }
         app.state = STATE.GETM;
       })
       .catch(function (error) {
@@ -302,7 +320,7 @@ function FinishTurnCallback(bestMove, fen, value, time, ply) {
            const r = move.match(re);
            if (r) {
                move = move.replace(re, ((turn == 0) ? ' White ' : ' Black ') + r[1]);
-            }
+           }
         }
         console.log('move = ' + move + ', time=' + time + ', value=' + value + ', ply=' + ply);
         logger.info('move = ' + move + ', time=' + time + ', value=' + value + ', ply=' + ply);
@@ -370,7 +388,7 @@ let sendMove = function(app) {
         console.log('[' + sid + '] fen = ' + fen);
         logger.info('[' + sid + '] fen = ' + fen);
         let moves = checkPrefix(fen);
-        if (moves) {
+        if (moves && (variant == 31)) {
             const m = moves.split(',');
             console.log(m);
             logger.info(m);
@@ -413,7 +431,7 @@ let sendMove = function(app) {
         } else {
             const re = /m/g;
             fen = fen.replace(re, '1');
-            garbo.FindMove(fen, _.random(MIN_AI_TIMEOUT + (timeout ? timeout : 0), MAX_AI_TIMEOUT + (timeout ? timeout : 0)), FinishTurnCallback);
+            garbo.FindMove(fen, _.random(MIN_AI_TIMEOUT + (timeout ? timeout : 0), MAX_AI_TIMEOUT + (timeout ? timeout : 0)), FinishTurnCallback, ai_flags, width, height);
         }
     } else {
         app.state  = STATE.STOP;
