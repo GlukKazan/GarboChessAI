@@ -431,7 +431,7 @@ let sendMove = function(app) {
         } else {
             const re = /m/g;
             fen = fen.replace(re, '1');
-            garbo.FindMove(fen, _.random(MIN_AI_TIMEOUT + (timeout ? timeout : 0), MAX_AI_TIMEOUT + (timeout ? timeout : 0)), FinishTurnCallback, ai_flags, width, height);
+            garbo.FindMove(fen, _.random(MIN_AI_TIMEOUT + (timeout ? timeout : 0), MAX_AI_TIMEOUT + (timeout ? timeout : 0)), FinishTurnCallback, ai_flags << 16, width, height);
         }
     } else {
         app.state  = STATE.STOP;

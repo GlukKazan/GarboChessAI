@@ -430,11 +430,19 @@ function Evaluate() {
 
     var evalAdjust = 0;
     // Black queen gone, then cancel white's penalty for king movement
-    if (g_pieceList[pieceQueen << 6] == 0)
-        evalAdjust -= pieceSquareAdj[pieceKing][g_pieceList[(colorWhite | pieceKing) << 6]];
+    if (g_pieceList[pieceQueen << 6] == 0) {
+        var kingPos = g_pieceList[(colorWhite | pieceKing) << 6];
+        if (kingPos != 0) {
+            evalAdjust -= pieceSquareAdj[pieceKing][kingPos];
+        }
+    }
     // White queen gone, then cancel black's penalty for king movement
-    if (g_pieceList[(colorWhite | pieceQueen) << 6] == 0) 
-        evalAdjust += pieceSquareAdj[pieceKing][flipTable[g_pieceList[pieceKing << 6]]];
+    if (g_pieceList[(colorWhite | pieceQueen) << 6] == 0) {
+        var kingPos = flipTable[g_pieceList[pieceKing << 6]];
+        if (kingPos != 0) {
+            evalAdjust += pieceSquareAdj[pieceKing][kingPos];
+        }
+    }
 
     // Black bishop pair
     if (g_pieceCount[pieceBishop] >= 2)
@@ -1605,10 +1613,15 @@ function InitializeFromFen(fen) {
     if (!g_toMove) g_baseEval = -g_baseEval;
 
     g_move50 = 0;
-    g_inCheck = IsSquareAttackable(g_pieceList[(g_toMove | pieceKing) << 6], them);
+    var kingPos = g_pieceList[(g_toMove | pieceKing) << 6];
+    g_inCheck = false;
+    if (kingPos != 0) {
+        g_inCheck = IsSquareAttackable(kingPos, them);
+    }
 
     // Check for king capture (invalid FEN)
-    if (IsSquareAttackable(g_pieceList[(them | pieceKing) << 6], g_toMove)) {
+    kingPos = g_pieceList[(them | pieceKing) << 6]
+    if ((kingPos != 0) && IsSquareAttackable(kingPos, g_toMove)) {
         return 'Invalid FEN: Can capture king';
     }
 
@@ -1800,22 +1813,24 @@ function MakeMove(move){
     g_baseEval = -g_baseEval;
     
     if ((piece & 0x7) == pieceKing || g_inCheck) {
-        if (IsSquareAttackable(g_pieceList[(pieceKing | (8 - g_toMove)) << 6], otherColor)) {
+        var kingPos =g_pieceList[(pieceKing | (8 - g_toMove)) << 6];
+        if ((kingPos != 0) && IsSquareAttackable(kingPos, otherColor)) {
             UnmakeMove(move);
             return false;
         }
     } else {
         var kingPos = g_pieceList[(pieceKing | (8 - g_toMove)) << 6];
-        
-        if (ExposesCheck(from, kingPos)) {
-            UnmakeMove(move);
-            return false;
-        }
-        
-        if (epcEnd != to) {
-            if (ExposesCheck(epcEnd, kingPos)) {
+        if (kingPos != 0) {
+            if (ExposesCheck(from, kingPos)) {
                 UnmakeMove(move);
                 return false;
+            }
+            
+            if (epcEnd != to) {
+                if (ExposesCheck(epcEnd, kingPos)) {
+                    UnmakeMove(move);
+                    return false;
+                }
             }
         }
     }
@@ -1824,25 +1839,30 @@ function MakeMove(move){
     
     if (flags <= moveflagEPC) {
         var theirKingPos = g_pieceList[(pieceKing | g_toMove) << 6];
+        if (theirKingPos != 0) {
+            // First check if the piece we moved can attack the enemy king
+            g_inCheck = IsSquareAttackableFrom(theirKingPos, to);
         
-        // First check if the piece we moved can attack the enemy king
-        g_inCheck = IsSquareAttackableFrom(theirKingPos, to);
-        
-        if (!g_inCheck) {
-            // Now check if the square we moved from exposes check on the enemy king
-            g_inCheck = ExposesCheck(from, theirKingPos);
-            
             if (!g_inCheck) {
-                // Finally, ep. capture can cause another square to be exposed
-                if (epcEnd != to) {
-                    g_inCheck = ExposesCheck(epcEnd, theirKingPos);
+                // Now check if the square we moved from exposes check on the enemy king
+                g_inCheck = ExposesCheck(from, theirKingPos);
+            
+                if (!g_inCheck) {
+                    // Finally, ep. capture can cause another square to be exposed
+                    if (epcEnd != to) {
+                        g_inCheck = ExposesCheck(epcEnd, theirKingPos);
+                    }
                 }
             }
         }
     }
     else {
         // Castle or promotion, slow check
-        g_inCheck = IsSquareAttackable(g_pieceList[(pieceKing | g_toMove) << 6], 8 - g_toMove);
+        g_inCheck = false;
+        var kingPos = g_pieceList[(pieceKing | g_toMove) << 6];
+        if (kingPos != 0) {
+            g_inCheck = IsSquareAttackable(kingPos, 8 - g_toMove);
+        }
     }
 
     g_repMoveStack[g_moveCount - 1] = g_hashKeyLow;
