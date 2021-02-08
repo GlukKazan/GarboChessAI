@@ -2249,8 +2249,9 @@ function GenerateCaptureMoves(moveStack, moveScores) {
 }
 
 function MovePawnTo(moveStack, start, square) {
-	var row = square & 0xF0;
-    if ((row == 0x90) || (row == 0x20)) {
+    var row = square & 0xF0;
+    var delta = (8 - g_height) << 4;
+    if ((row == (0x90 - delta) || (row == 0x20))) {
         if (g_flags & moveflagPromoteQueen) {
             moveStack[moveStack.length] = GenerateMove(start, square, moveflagPromotion | moveflagPromoteQueen);
         }
