@@ -1378,12 +1378,12 @@ function ResetGame() {
         }
     }
 
-    pieceSquareAdj[piecePawn] = MakeTable(pawnAdj);
-    pieceSquareAdj[pieceKnight] = MakeTable(knightAdj);
-    pieceSquareAdj[pieceBishop] = MakeTable(bishopAdj);
-    pieceSquareAdj[pieceRook] = MakeTable(rookAdj);
+    pieceSquareAdj[piecePawn] = MakeTable(((g_width == 8) && (g_height == 8)) ? pawnAdj : emptyAdj);
+    pieceSquareAdj[pieceKnight] = MakeTable(((g_width == 8) && (g_height == 8)) ? knightAdj : emptyAdj);
+    pieceSquareAdj[pieceBishop] = MakeTable(((g_width == 8) && (g_height == 8)) ? bishopAdj: emptyAdj);
+    pieceSquareAdj[pieceRook] = MakeTable(((g_width == 8) && (g_height == 8)) ? rookAdj : emptyAdj);
     pieceSquareAdj[pieceQueen] = MakeTable(emptyAdj);
-    pieceSquareAdj[pieceKing] = MakeTable(kingAdj);
+    pieceSquareAdj[pieceKing] = MakeTable(((g_width == 8) && (g_height == 8)) ? kingAdj: emptyAdj);
 
     var pieceDeltas = [[], [], g_knightDeltas, g_bishopDeltas, g_rookDeltas, g_queenDeltas, g_queenDeltas];
 
