@@ -396,7 +396,7 @@ let sendMove = function(app) {
             if (m.length > 1) {
                 ix = _.random(0, m.length - 1);
             }
-            const move = m[ix];
+            const move = m[ix].replace(/(\w\d)(\w\d)/, '$1-$2');
             console.log('move = ' + move);
             logger.info('move = ' + move);
             const f = getFen(fen, move);
