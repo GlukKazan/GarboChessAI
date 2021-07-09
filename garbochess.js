@@ -650,7 +650,8 @@ function IsHashMoveValid(hashMove) {
         }
 
         var row = to & 0xF0;
-        if (((row == 0x90 && !g_toMove) ||
+        var delta = (8 - g_height) << 4;
+        if (((row == (0x90 - delta) && !g_toMove) ||
              (row == 0x20 && g_toMove)) != (hashMove & moveflagPromotion)) {
             // Handle promotions
             return false;
